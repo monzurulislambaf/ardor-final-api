@@ -86,10 +86,10 @@ export const env = {
   isTest: raw.NODE_ENV === 'test',
   /** Parsed list of allowed browser origins. */
   clientOrigins: raw.CLIENT_ORIGIN.split(',')
-    .map((origin) => origin.trim())
+    .map((origin) => origin.trim().replace(/\/+$/, ''))
     .filter(Boolean),
   /** First origin, used to build links (e.g. password reset). */
-  primaryClientOrigin: raw.CLIENT_ORIGIN.split(',')[0]?.trim() ?? 'http://localhost:3000',
+  primaryClientOrigin: raw.CLIENT_ORIGIN.split(',')[0]?.trim().replace(/\/+$/, '') || 'http://localhost:3000',
   /** Absolute upload directory (relative values resolve against the working directory). */
   uploadDir: path.resolve(process.cwd(), raw.UPLOAD_DIR),
   maxUploadBytes: Math.floor(raw.MAX_UPLOAD_SIZE_MB * 1024 * 1024),
