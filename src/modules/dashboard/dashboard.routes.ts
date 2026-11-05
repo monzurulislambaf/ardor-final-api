@@ -6,7 +6,8 @@ const router = Router();
 
 router.use(authenticate);
 
-router.get('/admin', authorize('admin', 'manager'), dashboardController.adminStats);
+router.get('/admin', authorize('admin', 'manager', 'super_admin'), dashboardController.adminStats);
 router.get('/client', dashboardController.clientStats);
+router.get('/expert', authorize('expert'), dashboardController.expertStats);
 
 export default router;

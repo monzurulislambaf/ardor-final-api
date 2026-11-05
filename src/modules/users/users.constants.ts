@@ -1,4 +1,4 @@
-export const USER_ROLES = ['user', 'client', 'staff', 'manager', 'admin'] as const;
+export const USER_ROLES = ['user', 'client', 'staff', 'manager', 'admin', 'super_admin', 'expert'] as const;
 export type UserRole = (typeof USER_ROLES)[number];
 
 export const USER_STATUSES = ['active', 'inactive', 'suspended'] as const;

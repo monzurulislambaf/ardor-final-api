@@ -21,23 +21,23 @@ router.patch('/me', validate({ body: updateProfileSchema }), usersController.upd
 // Administration
 router.get(
   '/',
-  authorize('admin', 'manager'),
+  authorize('admin', 'manager', 'super_admin'),
   validate({ query: listUsersQuerySchema }),
   usersController.list,
 );
-router.post('/', authorize('admin'), validate({ body: createUserSchema }), usersController.create);
+router.post('/', authorize('admin', 'super_admin'), validate({ body: createUserSchema }), usersController.create);
 router.get(
   '/:id',
-  authorize('admin', 'manager'),
+  authorize('admin', 'manager', 'super_admin'),
   validate({ params: idParamsSchema }),
   usersController.getById,
 );
 router.patch(
   '/:id',
-  authorize('admin'),
+  authorize('admin', 'super_admin'),
   validate({ params: idParamsSchema, body: updateUserSchema }),
   usersController.update,
 );
-router.delete('/:id', authorize('admin'), validate({ params: idParamsSchema }), usersController.remove);
+router.delete('/:id', authorize('admin', 'super_admin'), validate({ params: idParamsSchema }), usersController.remove);
 
 export default router;

@@ -16,12 +16,12 @@ router.get('/public/:slug', expertsController.getBySlug);
 
 // Admin endpoints
 router.use(authenticate);
-router.get('/', authorize('admin', 'manager'), validate({ query: listExpertsQuerySchema }), expertsController.list);
-router.post('/', authorize('admin'), validate({ body: createExpertSchema }), expertsController.create);
+router.get('/', authorize('admin', 'manager', 'super_admin'), validate({ query: listExpertsQuerySchema }), expertsController.list);
+router.post('/', authorize('admin', 'super_admin'), validate({ body: createExpertSchema }), expertsController.create);
 // multipart/form-data, single image in field "photo"; returns { url } to store on the expert.
-router.post('/photo', authorize('admin'), uploadFiles('photo', 1), expertsController.uploadPhoto);
-router.get('/:id', authorize('admin', 'manager'), validate({ params: idParamsSchema }), expertsController.getById);
-router.patch('/:id', authorize('admin'), validate({ params: idParamsSchema, body: updateExpertSchema }), expertsController.update);
-router.delete('/:id', authorize('admin'), validate({ params: idParamsSchema }), expertsController.remove);
+router.post('/photo', authorize('admin', 'super_admin', 'expert'), uploadFiles('photo', 1), expertsController.uploadPhoto);
+router.get('/:id', authorize('admin', 'manager', 'super_admin'), validate({ params: idParamsSchema }), expertsController.getById);
+router.patch('/:id', authorize('admin', 'super_admin'), validate({ params: idParamsSchema, body: updateExpertSchema }), expertsController.update);
+router.delete('/:id', authorize('admin', 'super_admin'), validate({ params: idParamsSchema }), expertsController.remove);
 
 export default router;

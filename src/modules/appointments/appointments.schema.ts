@@ -28,6 +28,10 @@ export const updateAppointmentSchema = z.object({
   { message: 'Provide at least one field to update' },
 );
 
+export const expertStatusUpdateSchema = z.object({
+  status: z.enum(APPOINTMENT_STATUSES),
+});
+
 export const listAppointmentsQuerySchema = paginationQuerySchema.extend({
   status: z.enum(APPOINTMENT_STATUSES).optional(),
   expertCategory: z.enum(EXPERT_CATEGORIES).optional(),

@@ -13,4 +13,9 @@ export const dashboardController = {
     const stats = await dashboardService.getClientStats(req.user!.id);
     sendSuccess(res, stats, 'Client dashboard stats retrieved successfully');
   }),
+
+  expertStats: asyncHandler(async (req: Request, res: Response) => {
+    const stats = await dashboardService.getExpertStats(req.user!.email);
+    sendSuccess(res, stats, 'Expert dashboard stats retrieved successfully');
+  }),
 };

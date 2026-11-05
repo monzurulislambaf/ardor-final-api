@@ -86,6 +86,13 @@ export const usersService = {
     }
 
     if (input.name !== undefined) user.name = input.name;
+    if (input.email !== undefined) {
+      const existing = await UserModel.findOne({ email: input.email }).select('_id');
+      if (existing && String(existing._id) !== id) {
+        throw AppError.conflict('Email is already in use', [{ field: 'email', message: 'email is already in use' }]);
+      }
+      user.email = input.email;
+    }
     if (input.role !== undefined) user.role = input.role;
     if (input.status !== undefined) user.status = input.status;
     return user.save();

@@ -3,6 +3,7 @@ import type { QueryFilter } from 'mongoose';
 import { AppError } from '../../utils/app-error';
 import { buildSearchFilter, paginate, parseSort } from '../../utils/pagination';
 import { UserModel } from '../users/users.model';
+import { ExpertModel } from '../experts/experts.model';
 import { type IAppointment, type AppointmentDocument, AppointmentModel } from './appointments.model';
 import type { CreateAppointmentInput, ListAppointmentsQuery, UpdateAppointmentInput } from './appointments.schema';
 
@@ -41,6 +42,29 @@ export const appointmentsService = {
 
   async listByUser(userId: string, query: ListAppointmentsQuery) {
     const filter: QueryFilter<IAppointment> = { user: userId as unknown as IAppointment['user'] };
+    if (query.status) filter.status = query.status;
+
+    return paginate(AppointmentModel, filter, {
+      page: query.page,
+      limit: query.limit,
+      sort: parseSort(query.sort, SORTABLE_FIELDS),
+      populate: 'expert',
+    });
+  },
+
+  /** Expert portal: returns appointments assigned to the expert whose profile email matches the given user email. */
+  async listByExpert(userEmail: string, query: ListAppointmentsQuery) {
+    const expert = await ExpertModel.findOne({ email: userEmail.toLowerCase() });
+    if (!expert) {
+      return paginate(AppointmentModel, { _id: null } as QueryFilter<IAppointment>, {
+        page: query.page ?? 1,
+        limit: query.limit ?? 20,
+        sort: { createdAt: -1 },
+        populate: 'expert',
+      });
+    }
+
+    const filter: QueryFilter<IAppointment> = { expert: expert._id as IAppointment['expert'] };
     if (query.status) filter.status = query.status;
 
     return paginate(AppointmentModel, filter, {
@@ -101,6 +125,26 @@ export const appointmentsService = {
     const appointment = await getAppointmentOrThrow(id);
     Object.assign(appointment, input);
     return appointment.save();
+  },
+
+  /** Expert portal: update status of an appointment assigned to this expert. */
+  async updateStatusByExpert(id: string, userEmail: string, status: string): Promise<AppointmentDocument> {
+    const expert = await ExpertModel.findOne({ email: userEmail.toLowerCase() });
+    if (!expert) throw AppError.forbidden('No expert profile linked to your account');
+
+    // Fetch without populate so appointment.expert is a raw ObjectId for safe comparison.
+    const appointment = await AppointmentModel.findById(id);
+    if (!appointment) throw AppError.notFound('Appointment not found');
+
+    if (String(appointment.expert) !== String(expert._id)) {
+      throw AppError.forbidden('You can only update your own appointments');
+    }
+    if (appointment.status === 'cancelled') {
+      throw AppError.badRequest('Cannot update a cancelled appointment');
+    }
+    appointment.status = status as AppointmentDocument['status'];
+    const saved = await appointment.save();
+    return saved.populate('expert', 'name slug category title');
   },
 
   async cancel(id: string, userId: string): Promise<AppointmentDocument> {

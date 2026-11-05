@@ -3,6 +3,7 @@ import { UserModel } from '../users/users.model';
 import { ExpertModel } from '../experts/experts.model';
 import { AppointmentModel } from '../appointments/appointments.model';
 import { EnquiryModel } from '../enquiries/enquiries.model';
+import type { IAppointment } from '../appointments/appointments.model';
 
 export const dashboardService = {
   async getAdminStats() {
@@ -32,6 +33,33 @@ export const dashboardService = {
       enquiriesByStatus: toMap(enquiriesByStatus),
       expertsByCategory: toMap(expertsByCategory),
     };
+  },
+
+  /** Expert portal stats: appointments assigned to the expert whose profile email matches the user's email. */
+  async getExpertStats(userEmail: string) {
+    const expert = await ExpertModel.findOne({ email: userEmail.toLowerCase() });
+    if (!expert) {
+      return { totalAppointments: 0, appointments: [], appointmentsByStatus: {} };
+    }
+
+    const expertId = expert._id as IAppointment['expert'];
+
+    const [totalAppointments, appointments, byStatus] = await Promise.all([
+      AppointmentModel.countDocuments({ expert: expertId }),
+      AppointmentModel.find({ expert: expertId }).sort({ createdAt: -1 }).limit(10).populate('expert', 'name slug category title'),
+      AppointmentModel.aggregate([
+        { $match: { expert: new Types.ObjectId(String(expert._id)) } },
+        { $group: { _id: '$status', count: { $sum: 1 } } },
+      ]),
+    ]);
+
+    const toMap = (arr: { _id: string; count: number }[]) => {
+      const m: Record<string, number> = {};
+      for (const r of arr) m[r._id] = r.count;
+      return m;
+    };
+
+    return { totalAppointments, appointments, appointmentsByStatus: toMap(byStatus) };
   },
 
   async getClientStats(userId: string) {

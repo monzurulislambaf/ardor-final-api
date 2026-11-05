@@ -21,6 +21,15 @@ export const appointmentsController = {
     sendPaginated(res, items, pagination, 'Appointments retrieved successfully');
   }),
 
+  // Expert: list appointments assigned to this expert (matched by user email ↔ expert.email)
+  listForExpert: asyncHandler(async (req: Request, res: Response) => {
+    const { items, pagination } = await appointmentsService.listByExpert(
+      req.user!.email,
+      req.query as unknown as ListAppointmentsQuery,
+    );
+    sendPaginated(res, items, pagination, 'Appointments retrieved successfully');
+  }),
+
   getById: asyncHandler(async (req: Request, res: Response) => {
     const appointment = await appointmentsService.getById((req.params as IdParams).id);
     sendSuccess(res, appointment, 'Appointment retrieved successfully');
@@ -36,6 +45,15 @@ export const appointmentsController = {
   update: asyncHandler(async (req: Request, res: Response) => {
     const appointment = await appointmentsService.update((req.params as IdParams).id, req.body);
     sendSuccess(res, appointment, 'Appointment updated successfully');
+  }),
+
+  updateStatusForExpert: asyncHandler(async (req: Request, res: Response) => {
+    const appointment = await appointmentsService.updateStatusByExpert(
+      (req.params as IdParams).id,
+      req.user!.email,
+      req.body.status as string,
+    );
+    sendSuccess(res, appointment, 'Appointment status updated successfully');
   }),
 
   cancel: asyncHandler(async (req: Request, res: Response) => {

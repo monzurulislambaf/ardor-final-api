@@ -29,6 +29,7 @@ export const createUserSchema = z.object({
 export const updateUserSchema = z
   .object({
     name: nameSchema.optional(),
+    email: emailSchema.optional(),
     role: z.enum(USER_ROLES).optional(),
     status: z.enum(USER_STATUSES).optional(),
   })
