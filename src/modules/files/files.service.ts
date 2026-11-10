@@ -14,6 +14,8 @@ import {
   IMAGE_MIME_TYPES,
   TEXT_EXTENSIONS,
 } from './files.constants';
+import { AppointmentModel } from '../appointments/appointments.model';
+import { ExpertModel } from '../experts/experts.model';
 import { type FileDocument, FileModel, type IFile } from './files.model';
 import type { ListFilesQuery } from './files.schema';
 
@@ -103,11 +105,45 @@ export const detectType = async (
   throw new AppError(`Unsupported file type for "${sanitizeFileName(file.originalname)}". Allowed: ${allowed}`, 415);
 };
 
-/** Look up a record the actor may access. Other users' files look like "not found". */
+/** Owner or privileged roles only. Used for mutating access (delete). */
 const findAccessible = async (id: string, actor: Express.AuthUser): Promise<FileDocument> => {
   const file = await FileModel.findOne({ _id: id, ...scopeFor(actor) });
   if (!file) throw AppError.notFound('File not found');
   return file;
+};
+
+/**
+ * A file attached to an appointment may be read by that appointment's members — the client who
+ * booked it and the expert assigned to it — not only the uploader. Experts are matched by email,
+ * the same way appointment listings match them.
+ */
+const canReadAppointmentFile = async (file: FileDocument, actor: Express.AuthUser): Promise<boolean> => {
+  if (!file.appointment) return false;
+  const appt = await AppointmentModel.findById(file.appointment).select('user expert');
+  if (!appt) return false;
+  if (appt.user && String(appt.user) === actor.id) return true;
+  if (actor.role === 'expert' && appt.expert) {
+    const expert = await ExpertModel.findById(appt.expert).select('email');
+    if (expert?.email && expert.email.toLowerCase() === actor.email.toLowerCase()) return true;
+  }
+  return false;
+};
+
+/**
+ * Read access: the uploader, a privileged role, or a member of the file's appointment. Non-members'
+ * files look like "not found". Used for download/view/metadata, never for delete.
+ */
+const findReadable = async (id: string, actor: Express.AuthUser): Promise<FileDocument> => {
+  const file = await FileModel.findById(id);
+  if (!file) throw AppError.notFound('File not found');
+  if (
+    PRIVILEGED_ROLES.includes(actor.role) ||
+    String(file.owner) === actor.id ||
+    (await canReadAppointmentFile(file, actor))
+  ) {
+    return file;
+  }
+  throw AppError.notFound('File not found');
 };
 
 export const filesService = {
@@ -173,11 +209,11 @@ export const filesService = {
     });
   },
 
-  getById: findAccessible,
+  getById: findReadable,
 
   /** Returns the record for streaming; `storedName` is resolved against UPLOAD_DIR by the caller. */
   async getForDownload(id: string, actor: Express.AuthUser) {
-    const file = await findAccessible(id, actor);
+    const file = await findReadable(id, actor);
     try {
       await fs.access(resolveStoredPath(file.storedName));
     } catch {
