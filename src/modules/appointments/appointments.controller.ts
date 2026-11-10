@@ -3,7 +3,7 @@ import { sendCreated, sendPaginated, sendSuccess } from '../../utils/api-respons
 import { asyncHandler } from '../../utils/async-handler';
 import type { IdParams } from '../../utils/object-id';
 import { appointmentsService } from './appointments.service';
-import type { ListAppointmentsQuery } from './appointments.schema';
+import type { ExpertConsultationUpdateInput, ListAppointmentsQuery } from './appointments.schema';
 
 export const appointmentsController = {
   // Admin: list all appointments
@@ -35,6 +35,18 @@ export const appointmentsController = {
     sendSuccess(res, appointment, 'Appointment retrieved successfully');
   }),
 
+  // Expert: get single appointment with consultation details
+  getByIdForExpert: asyncHandler(async (req: Request, res: Response) => {
+    const appointment = await appointmentsService.getByIdForExpert((req.params as IdParams).id, req.user!.email);
+    sendSuccess(res, appointment, 'Appointment retrieved successfully');
+  }),
+
+  // Client: get own appointment with meeting URL
+  getByIdForClient: asyncHandler(async (req: Request, res: Response) => {
+    const appointment = await appointmentsService.getByIdForClient((req.params as IdParams).id, req.user!.id);
+    sendSuccess(res, appointment, 'Appointment retrieved successfully');
+  }),
+
   // Public: create appointment (optionally creates a client account)
   create: asyncHandler(async (req: Request, res: Response) => {
     const userId = req.user?.id;
@@ -54,6 +66,16 @@ export const appointmentsController = {
       req.body.status as string,
     );
     sendSuccess(res, appointment, 'Appointment status updated successfully');
+  }),
+
+  // Expert: update consultation details (meeting URL, notes, diagnosis, etc.)
+  updateConsultationForExpert: asyncHandler(async (req: Request, res: Response) => {
+    const appointment = await appointmentsService.updateConsultationByExpert(
+      (req.params as IdParams).id,
+      req.user!.email,
+      req.body as ExpertConsultationUpdateInput,
+    );
+    sendSuccess(res, appointment, 'Consultation updated successfully');
   }),
 
   cancel: asyncHandler(async (req: Request, res: Response) => {

@@ -23,6 +23,15 @@ export interface IUser {
   passwordChangedAt?: Date;
   passwordResetTokenHash?: string;
   passwordResetExpiresAt?: Date;
+  // Profile fields
+  phone?: string;
+  profilePhoto?: string;
+  dateOfBirth?: Date;
+  emergencyContactName?: string;
+  emergencyContactPhone?: string;
+  medicalHistorySummary?: string;
+  /** ObjectId reference to the linked Expert profile (for expert role users). */
+  linkedExpert?: import('mongoose').Types.ObjectId;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -61,6 +70,13 @@ const userSchema = new Schema<IUser, UserModelType, IUserMethods>(
     passwordChangedAt: { type: Date, select: false },
     passwordResetTokenHash: { type: String, select: false, index: true, sparse: true },
     passwordResetExpiresAt: { type: Date, select: false },
+    phone: { type: String, trim: true, maxlength: 30 },
+    profilePhoto: { type: String, maxlength: 2048 },
+    dateOfBirth: { type: Date },
+    emergencyContactName: { type: String, trim: true, maxlength: 200 },
+    emergencyContactPhone: { type: String, trim: true, maxlength: 30 },
+    medicalHistorySummary: { type: String, maxlength: 5000 },
+    linkedExpert: { type: Schema.Types.ObjectId, ref: 'Expert' },
   },
   {
     ...baseSchemaOptions,

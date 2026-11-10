@@ -36,7 +36,14 @@ export const updateUserSchema = z
   .refine((value) => Object.keys(value).length > 0, { message: 'Provide at least one field to update' });
 
 export const updateProfileSchema = z
-  .object({ name: nameSchema.optional() })
+  .object({
+    name: nameSchema.optional(),
+    phone: z.string().trim().min(5).max(30).optional(),
+    dateOfBirth: z.coerce.date().optional(),
+    emergencyContactName: z.string().trim().max(200).optional(),
+    emergencyContactPhone: z.string().trim().max(30).optional(),
+    medicalHistorySummary: z.string().max(5000).optional(),
+  })
   .refine((value) => Object.keys(value).length > 0, { message: 'Provide at least one field to update' });
 
 export const listUsersQuerySchema = paginationQuerySchema.extend({

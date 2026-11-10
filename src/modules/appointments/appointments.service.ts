@@ -5,7 +5,7 @@ import { buildSearchFilter, paginate, parseSort } from '../../utils/pagination';
 import { UserModel } from '../users/users.model';
 import { ExpertModel } from '../experts/experts.model';
 import { type IAppointment, type AppointmentDocument, AppointmentModel } from './appointments.model';
-import type { CreateAppointmentInput, ListAppointmentsQuery, UpdateAppointmentInput } from './appointments.schema';
+import type { CreateAppointmentInput, ExpertConsultationUpdateInput, ListAppointmentsQuery, UpdateAppointmentInput } from './appointments.schema';
 
 const SORTABLE_FIELDS = ['createdAt', 'updatedAt', 'preferredDate', 'status', 'clientName'];
 const SEARCHABLE_FIELDS = ['clientName', 'clientEmail', 'referenceNumber'];
@@ -115,6 +115,7 @@ export const appointmentsService = {
       preferredDate: input.preferredDate,
       preferredTime: input.preferredTime,
       notes: input.notes,
+      followUpOf: input.followUpOf,
       referenceNumber: generateReferenceNumber(),
     });
 
@@ -125,6 +126,60 @@ export const appointmentsService = {
     const appointment = await getAppointmentOrThrow(id);
     Object.assign(appointment, input);
     return appointment.save();
+  },
+
+  /** Expert portal: update consultation details (meeting URL, notes, diagnosis, etc.). */
+  async updateConsultationByExpert(id: string, userEmail: string, input: ExpertConsultationUpdateInput): Promise<AppointmentDocument> {
+    const expert = await ExpertModel.findOne({ email: userEmail.toLowerCase() });
+    if (!expert) throw AppError.forbidden('No expert profile linked to your account');
+
+    const appointment = await AppointmentModel.findById(id).select('+meetingUrl +consultationNotes +diagnosisNotes +treatmentPlan');
+    if (!appointment) throw AppError.notFound('Appointment not found');
+    if (String(appointment.expert) !== String(expert._id)) throw AppError.forbidden('You can only update your own appointments');
+
+    const allowedUpdates: Partial<IAppointment> = {};
+    if (input.meetingUrl !== undefined) allowedUpdates.meetingUrl = input.meetingUrl;
+    if (input.meetingProvider !== undefined) allowedUpdates.meetingProvider = input.meetingProvider;
+    if (input.consultationInstructions !== undefined) allowedUpdates.consultationInstructions = input.consultationInstructions;
+    if (input.consultationNotes !== undefined) allowedUpdates.consultationNotes = input.consultationNotes;
+    if (input.diagnosisNotes !== undefined) allowedUpdates.diagnosisNotes = input.diagnosisNotes;
+    if (input.treatmentPlan !== undefined) allowedUpdates.treatmentPlan = input.treatmentPlan;
+    if (input.followUpRecommendation !== undefined) allowedUpdates.followUpRecommendation = input.followUpRecommendation;
+    if (input.status !== undefined) {
+      if (appointment.status === 'cancelled') throw AppError.badRequest('Cannot update a cancelled appointment');
+      allowedUpdates.status = input.status;
+      if (input.status === 'completed') allowedUpdates.completedAt = new Date();
+      if (input.status === 'in-progress') allowedUpdates.consultationStartedAt = new Date();
+    }
+
+    Object.assign(appointment, allowedUpdates);
+    const saved = await appointment.save();
+    return saved.populate('expert', 'name slug category title');
+  },
+
+  /** Get a single appointment with private consultation fields (for experts and admins). */
+  async getByIdForExpert(id: string, userEmail: string): Promise<AppointmentDocument> {
+    const expert = await ExpertModel.findOne({ email: userEmail.toLowerCase() });
+    if (!expert) throw AppError.forbidden('No expert profile linked to your account');
+
+    const appointment = await AppointmentModel.findById(id)
+      .select('+meetingUrl +consultationNotes +diagnosisNotes +treatmentPlan')
+      .populate('expert', 'name slug category title');
+    if (!appointment) throw AppError.notFound('Appointment not found');
+    if (String(appointment.expert?._id ?? appointment.expert) !== String(expert._id)) {
+      throw AppError.forbidden('You can only view your own appointments');
+    }
+    return appointment;
+  },
+
+  /** Get a single appointment for the patient (includes meeting URL but not private notes). */
+  async getByIdForClient(id: string, userId: string): Promise<AppointmentDocument> {
+    const appointment = await AppointmentModel.findById(id)
+      .select('+meetingUrl')
+      .populate('expert', 'name slug category title image');
+    if (!appointment) throw AppError.notFound('Appointment not found');
+    if (String(appointment.user) !== userId) throw AppError.forbidden('You can only view your own appointments');
+    return appointment;
   },
 
   /** Expert portal: update status of an appointment assigned to this expert. */

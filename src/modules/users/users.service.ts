@@ -101,6 +101,11 @@ export const usersService = {
   async updateProfile(id: string, input: UpdateProfileInput): Promise<UserDocument> {
     const user = await getUserOrThrow(id);
     if (input.name !== undefined) user.name = input.name;
+    if (input.phone !== undefined) user.phone = input.phone;
+    if (input.dateOfBirth !== undefined) user.dateOfBirth = input.dateOfBirth;
+    if (input.emergencyContactName !== undefined) user.emergencyContactName = input.emergencyContactName;
+    if (input.emergencyContactPhone !== undefined) user.emergencyContactPhone = input.emergencyContactPhone;
+    if (input.medicalHistorySummary !== undefined) user.medicalHistorySummary = input.medicalHistorySummary;
     return user.save();
   },
 

@@ -8,6 +8,8 @@ import expertsRoutes from './modules/experts/experts.routes';
 import appointmentsRoutes from './modules/appointments/appointments.routes';
 import enquiriesRoutes from './modules/enquiries/enquiries.routes';
 import dashboardRoutes from './modules/dashboard/dashboard.routes';
+import availabilityRoutes from './modules/availability/availability.routes';
+import notificationsRoutes from './modules/notifications/notifications.routes';
 import { sendError, sendSuccess } from './utils/api-response';
 
 const router = Router();
@@ -35,6 +37,8 @@ router.use('/experts', expertsRoutes);
 router.use('/appointments', appointmentsRoutes);
 router.use('/enquiries', enquiriesRoutes);
 router.use('/dashboard', dashboardRoutes);
+router.use('/availability', availabilityRoutes);
+router.use('/notifications', notificationsRoutes);
 router.use('/examples', exampleRoutes);
 router.use('/files', filesRoutes);
 
