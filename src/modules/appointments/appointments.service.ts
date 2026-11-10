@@ -4,6 +4,7 @@ import { AppError } from '../../utils/app-error';
 import { buildSearchFilter, paginate, parseSort } from '../../utils/pagination';
 import { UserModel } from '../users/users.model';
 import { ExpertModel } from '../experts/experts.model';
+import { notificationsService } from '../notifications/notifications.service';
 import { type IAppointment, type AppointmentDocument, AppointmentModel } from './appointments.model';
 import type { CreateAppointmentInput, ExpertConsultationUpdateInput, ListAppointmentsQuery, UpdateAppointmentInput } from './appointments.schema';
 
@@ -114,10 +115,25 @@ export const appointmentsService = {
       type: input.type,
       preferredDate: input.preferredDate,
       preferredTime: input.preferredTime,
+      scheduledDate: input.preferredDate,
+      scheduledTime: input.preferredTime,
       notes: input.notes,
       followUpOf: input.followUpOf,
       referenceNumber: generateReferenceNumber(),
+      status: 'confirmed',
     });
+
+    // Notify the client
+    if (assignedUserId) {
+      notificationsService.create({
+        userId: assignedUserId,
+        type: 'appointment_booked',
+        title: 'Appointment Confirmed',
+        message: `Your appointment (${appointment.referenceNumber}) has been confirmed.`,
+        resourceId: String(appointment._id),
+        resourceType: 'appointment',
+      }).catch(() => { /* non-fatal */ });
+    }
 
     return { appointment, autoCreatedUser };
   },
@@ -145,6 +161,7 @@ export const appointmentsService = {
     if (input.diagnosisNotes !== undefined) allowedUpdates.diagnosisNotes = input.diagnosisNotes;
     if (input.treatmentPlan !== undefined) allowedUpdates.treatmentPlan = input.treatmentPlan;
     if (input.followUpRecommendation !== undefined) allowedUpdates.followUpRecommendation = input.followUpRecommendation;
+    const prevStatus = appointment.status;
     if (input.status !== undefined) {
       if (appointment.status === 'cancelled') throw AppError.badRequest('Cannot update a cancelled appointment');
       allowedUpdates.status = input.status;
@@ -154,6 +171,42 @@ export const appointmentsService = {
 
     Object.assign(appointment, allowedUpdates);
     const saved = await appointment.save();
+
+    // Notify client about key status changes and meeting link
+    if (appointment.user) {
+      const userId = String(appointment.user);
+      if (input.meetingUrl) {
+        notificationsService.create({
+          userId,
+          type: prevStatus ? 'meeting_link_updated' : 'meeting_link_added',
+          title: 'Meeting Link Ready',
+          message: `Your consultation meeting link for ${appointment.referenceNumber} is now available.`,
+          resourceId: String(appointment._id),
+          resourceType: 'appointment',
+        }).catch(() => { /* non-fatal */ });
+      }
+      if (input.status === 'in-progress') {
+        notificationsService.create({
+          userId,
+          type: 'consultation_started',
+          title: 'Consultation Started',
+          message: `Your consultation session ${appointment.referenceNumber} has started.`,
+          resourceId: String(appointment._id),
+          resourceType: 'appointment',
+        }).catch(() => { /* non-fatal */ });
+      }
+      if (input.status === 'completed') {
+        notificationsService.create({
+          userId,
+          type: 'appointment_completed',
+          title: 'Consultation Complete',
+          message: `Your appointment ${appointment.referenceNumber} has been completed.`,
+          resourceId: String(appointment._id),
+          resourceType: 'appointment',
+        }).catch(() => { /* non-fatal */ });
+      }
+    }
+
     return saved.populate('expert', 'name slug category title');
   },
 
@@ -199,6 +252,29 @@ export const appointmentsService = {
     }
     appointment.status = status as AppointmentDocument['status'];
     const saved = await appointment.save();
+
+    if (appointment.user) {
+      const userId = String(appointment.user);
+      const statusMessages: Record<string, { type: string; title: string; message: string }> = {
+        confirmed: { type: 'appointment_confirmed', title: 'Appointment Confirmed', message: `Your appointment ${appointment.referenceNumber} has been confirmed.` },
+        cancelled: { type: 'appointment_cancelled', title: 'Appointment Cancelled', message: `Your appointment ${appointment.referenceNumber} has been cancelled by the expert.` },
+        completed: { type: 'appointment_completed', title: 'Consultation Complete', message: `Your appointment ${appointment.referenceNumber} has been completed.` },
+        'in-progress': { type: 'consultation_started', title: 'Consultation Started', message: `Your consultation ${appointment.referenceNumber} has started.` },
+        'no-show': { type: 'appointment_no_show', title: 'Marked as No-Show', message: `Appointment ${appointment.referenceNumber} has been marked as no-show.` },
+      };
+      const notif = statusMessages[status];
+      if (notif) {
+        notificationsService.create({
+          userId,
+          type: notif.type as Parameters<typeof notificationsService.create>[0]['type'],
+          title: notif.title,
+          message: notif.message,
+          resourceId: String(appointment._id),
+          resourceType: 'appointment',
+        }).catch(() => { /* non-fatal */ });
+      }
+    }
+
     return saved.populate('expert', 'name slug category title');
   },
 
@@ -209,7 +285,16 @@ export const appointmentsService = {
       throw AppError.badRequest(`Cannot cancel an appointment that is already ${appointment.status}`);
     }
     appointment.status = 'cancelled';
-    return appointment.save();
+    const saved = await appointment.save();
+    notificationsService.create({
+      userId,
+      type: 'appointment_cancelled',
+      title: 'Appointment Cancelled',
+      message: `Your appointment ${appointment.referenceNumber} has been cancelled.`,
+      resourceId: String(appointment._id),
+      resourceType: 'appointment',
+    }).catch(() => { /* non-fatal */ });
+    return saved;
   },
 
   async remove(id: string): Promise<void> {

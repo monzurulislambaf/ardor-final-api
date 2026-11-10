@@ -1,6 +1,6 @@
 import { type HydratedDocument, model, Schema, type Types } from 'mongoose';
 import { baseSchemaOptions } from '../../utils/mongoose';
-import { FILE_KINDS, type FileKind } from './files.constants';
+import { DOCUMENT_TYPES, FILE_KINDS, type DocumentType, type FileKind } from './files.constants';
 
 export interface IFile {
   owner: Types.ObjectId;
@@ -13,6 +13,11 @@ export interface IFile {
   extension: string;
   size: number;
   kind: FileKind;
+  /** Links the file to an appointment (prescriptions, documents). */
+  appointment?: Types.ObjectId;
+  documentType?: DocumentType;
+  /** Free-text description supplied at upload. */
+  description?: string;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -28,6 +33,9 @@ const fileSchema = new Schema<IFile>(
     extension: { type: String, required: true },
     size: { type: Number, required: true, min: 1 },
     kind: { type: String, enum: FILE_KINDS, required: true },
+    appointment: { type: Schema.Types.ObjectId, ref: 'Appointment' },
+    documentType: { type: String, enum: DOCUMENT_TYPES },
+    description: { type: String, maxlength: 1000 },
   },
   {
     ...baseSchemaOptions,
@@ -45,5 +53,6 @@ const fileSchema = new Schema<IFile>(
 
 fileSchema.index({ owner: 1, createdAt: -1 });
 fileSchema.index({ owner: 1, kind: 1, createdAt: -1 });
+fileSchema.index({ appointment: 1, createdAt: -1 });
 
 export const FileModel = model<IFile>('File', fileSchema);

@@ -4,6 +4,9 @@ import { sendCreated, sendPaginated, sendSuccess } from '../../utils/api-respons
 import { AppError } from '../../utils/app-error';
 import { asyncHandler } from '../../utils/async-handler';
 import type { IdParams } from '../../utils/object-id';
+import { AppointmentModel } from '../appointments/appointments.model';
+import { notificationsService } from '../notifications/notifications.service';
+import type { DocumentType } from './files.constants';
 import type { ListFilesQuery } from './files.schema';
 import { filesService } from './files.service';
 
@@ -70,5 +73,42 @@ export const filesController = {
   remove: asyncHandler(async (req: Request, res: Response) => {
     await filesService.remove((req.params as IdParams).id, actor(req));
     sendSuccess(res, null, 'File deleted successfully');
+  }),
+
+  /** List all documents attached to a specific appointment. */
+  listAppointmentDocuments: asyncHandler(async (req: Request, res: Response) => {
+    const appointmentId = req.params.appointmentId as string;
+    const files = await filesService.listForAppointment(appointmentId);
+    sendSuccess(res, files, 'Documents retrieved successfully');
+  }),
+
+  /** Upload documents (prescription, lab result, etc.) for an appointment. */
+  uploadAppointmentDocuments: asyncHandler(async (req: Request, res: Response) => {
+    const appointmentId = req.params.appointmentId as string;
+    const documentType = (req.body?.documentType as DocumentType) || 'other';
+    const description = req.body?.description as string | undefined;
+    const files = await filesService.saveAppointmentDocuments(
+      req.files as Express.Multer.File[],
+      actor(req),
+      appointmentId,
+      documentType,
+      description,
+    );
+
+    // Notify patient about the new document
+    const appt = await AppointmentModel.findById(appointmentId).select('user referenceNumber');
+    if (appt?.user) {
+      const type = documentType === 'prescription' ? 'prescription_uploaded' : 'document_uploaded';
+      notificationsService.create({
+        userId: String(appt.user),
+        type,
+        title: documentType === 'prescription' ? 'New Prescription Added' : 'New Document Added',
+        message: `A new ${documentType.replace('_', ' ')} has been added to your appointment ${appt.referenceNumber}.`,
+        resourceId: String(appt._id),
+        resourceType: 'appointment',
+      }).catch(() => { /* non-fatal */ });
+    }
+
+    sendCreated(res, files, `${files.length} document(s) uploaded successfully`);
   }),
 };

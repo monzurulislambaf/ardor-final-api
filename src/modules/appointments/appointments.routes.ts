@@ -1,7 +1,9 @@
 import { Router } from 'express';
 import { authenticate, authorize, optionalAuthenticate } from '../../middlewares/auth.middleware';
+import { uploadFiles } from '../../middlewares/upload.middleware';
 import { validate } from '../../middlewares/validate.middleware';
 import { idParamsSchema } from '../../utils/object-id';
+import { filesController } from '../files/files.controller';
 import { appointmentsController } from './appointments.controller';
 import { createAppointmentSchema, expertConsultationUpdateSchema, expertStatusUpdateSchema, listAppointmentsQuerySchema, updateAppointmentSchema } from './appointments.schema';
 
@@ -24,11 +26,15 @@ router.get('/expert/:id', authorize('expert'), validate({ params: idParamsSchema
 router.patch('/:id/expert-status', authorize('expert'), validate({ params: idParamsSchema, body: expertStatusUpdateSchema }), appointmentsController.updateStatusForExpert);
 router.patch('/:id/consultation', authorize('expert'), validate({ params: idParamsSchema, body: expertConsultationUpdateSchema }), appointmentsController.updateConsultationForExpert);
 
+// Documents attached to an appointment (client view, expert/admin upload)
+router.get('/:appointmentId/documents', filesController.listAppointmentDocuments);
+router.post('/:appointmentId/documents', authorize('expert', 'admin', 'super_admin'), uploadFiles('files'), filesController.uploadAppointmentDocuments);
+
 // Admin/Manager/Super-admin
 router.get('/', authorize('admin', 'manager', 'super_admin'), validate({ query: listAppointmentsQuerySchema }), appointmentsController.list);
 router.get('/stats', authorize('admin', 'manager', 'super_admin'), appointmentsController.stats);
 router.get('/:id', authorize('admin', 'manager', 'super_admin'), validate({ params: idParamsSchema }), appointmentsController.getById);
-router.patch('/:id', authorize('admin', 'super_admin'), validate({ params: idParamsSchema, body: updateAppointmentSchema }), appointmentsController.update);
+router.patch('/:id', authorize('admin', 'manager', 'super_admin'), validate({ params: idParamsSchema, body: updateAppointmentSchema }), appointmentsController.update);
 router.delete('/:id', authorize('admin', 'super_admin'), validate({ params: idParamsSchema }), appointmentsController.remove);
 
 export default router;

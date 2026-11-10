@@ -8,6 +8,8 @@ import { logger } from '../../utils/logger';
 import { buildSearchFilter, paginate, parseSort } from '../../utils/pagination';
 import {
   DOCUMENT_MIME_TYPES,
+  DOCUMENT_TYPES,
+  type DocumentType,
   type FileKind,
   IMAGE_MIME_TYPES,
   TEXT_EXTENSIONS,
@@ -188,5 +190,57 @@ export const filesService = {
     const file = await findAccessible(id, actor);
     await file.deleteOne();
     await removeQuietly(resolveStoredPath(file.storedName));
+  },
+
+  /** List all documents attached to an appointment. */
+  async listForAppointment(appointmentId: string): Promise<FileDocument[]> {
+    return FileModel.find({ appointment: appointmentId }).sort({ createdAt: -1 });
+  },
+
+  /** Upload documents attached to an appointment (expert uploads prescription/report etc.). */
+  async saveAppointmentDocuments(
+    uploads: Express.Multer.File[] | undefined,
+    actor: Express.AuthUser,
+    appointmentId: string,
+    documentType: DocumentType = 'other',
+    description?: string,
+  ): Promise<FileDocument[]> {
+    if (!uploads || uploads.length === 0) throw AppError.badRequest('No files were uploaded');
+
+    const movedPaths: string[] = [];
+    try {
+      const prepared: { upload: Express.Multer.File; type: DetectedType }[] = [];
+      for (const upload of uploads) {
+        if (upload.size === 0) throw AppError.badRequest(`"${sanitizeFileName(upload.originalname)}" is empty`);
+        prepared.push({ upload, type: await detectType(upload, {}) });
+      }
+
+      const documents: FileDocument[] = [];
+      for (const { upload, type } of prepared) {
+        const storedName = `${randomUUID()}.${type.extension}`;
+        await fs.rename(upload.path, resolveStoredPath(storedName));
+        movedPaths.push(resolveStoredPath(storedName));
+        documents.push(
+          new FileModel({
+            owner: actor.id,
+            originalName: sanitizeFileName(upload.originalname),
+            storedName,
+            mimeType: type.mimeType,
+            extension: type.extension,
+            size: upload.size,
+            kind: type.kind,
+            appointment: appointmentId,
+            documentType: DOCUMENT_TYPES.includes(documentType) ? documentType : 'other',
+            description,
+          }),
+        );
+      }
+
+      await FileModel.insertMany(documents);
+      return documents;
+    } catch (error) {
+      await Promise.all([...uploads.map((u) => removeQuietly(u.path)), ...movedPaths.map(removeQuietly)]);
+      throw error;
+    }
   },
 };

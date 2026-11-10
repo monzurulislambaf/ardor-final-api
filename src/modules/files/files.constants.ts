@@ -1,6 +1,9 @@
 export const FILE_KINDS = ['image', 'document'] as const;
 export type FileKind = (typeof FILE_KINDS)[number];
 
+export const DOCUMENT_TYPES = ['prescription', 'lab_result', 'referral', 'medical_report', 'other'] as const;
+export type DocumentType = (typeof DOCUMENT_TYPES)[number];
+
 /**
  * Allow-lists keyed by the type detected from the file's content (magic bytes),
  * never from the client-supplied name or Content-Type. SVG and HTML are
