@@ -56,4 +56,14 @@ export const expertsController = {
     const counts = await expertsService.countByCategory();
     sendSuccess(res, counts, 'Expert counts retrieved successfully');
   }),
+
+  getMe: asyncHandler(async (req: Request, res: Response) => {
+    const expert = await expertsService.getMe(req.user!.email);
+    sendSuccess(res, expert, 'Expert profile retrieved successfully');
+  }),
+
+  updateMe: asyncHandler(async (req: Request, res: Response) => {
+    const expert = await expertsService.updateMe(req.user!.email, req.body);
+    sendSuccess(res, expert, 'Expert profile updated successfully');
+  }),
 };

@@ -50,6 +50,14 @@ export const updateExpertSchema = createExpertSchema.partial().refine(
   { message: 'Provide at least one field to update' },
 );
 
+/** Expert self-update: cannot change slug, status, featured, order, email (admin-only). */
+export const expertSelfUpdateSchema = createExpertSchema
+  .omit({ slug: true, status: true, featured: true, order: true, email: true })
+  .partial()
+  .refine((value) => Object.keys(value).length > 0, { message: 'Provide at least one field to update' });
+
+export type ExpertSelfUpdateInput = z.infer<typeof expertSelfUpdateSchema>;
+
 export const listExpertsQuerySchema = paginationQuerySchema.extend({
   category: z.enum(EXPERT_CATEGORIES).optional(),
   status: z.enum(EXPERT_STATUSES).optional(),

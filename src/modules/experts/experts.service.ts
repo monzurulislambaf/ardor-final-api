@@ -87,6 +87,30 @@ export const expertsService = {
 
   uploadPhoto: expertPhotos.save,
 
+  /** Expert portal: get the expert profile linked to the signed-in user's email. */
+  async getMe(userEmail: string): Promise<ExpertDocument> {
+    const expert = await ExpertModel.findOne({ email: userEmail.toLowerCase() });
+    if (!expert) throw AppError.notFound('No expert profile is linked to your account');
+    return expert;
+  },
+
+  /** Expert portal: update own profile (admin-only fields are excluded in the route schema). */
+  async updateMe(userEmail: string, input: UpdateExpertInput): Promise<ExpertDocument> {
+    const expert = await ExpertModel.findOne({ email: userEmail.toLowerCase() });
+    if (!expert) throw AppError.notFound('No expert profile is linked to your account');
+
+    if (input.slug && input.slug !== expert.slug) {
+      const existing = await ExpertModel.exists({ slug: input.slug, _id: { $ne: expert._id } });
+      if (existing) throw AppError.conflict('An expert with this slug already exists', [{ field: 'slug', message: 'slug is already in use' }]);
+    }
+
+    const previousImage = expert.image;
+    Object.assign(expert, input);
+    const saved = await expert.save();
+    if (previousImage !== saved.image) await expertPhotos.removeIfUploaded(previousImage);
+    return saved;
+  },
+
   async countByCategory() {
     const result = await ExpertModel.aggregate([
       { $match: { status: 'active' } },

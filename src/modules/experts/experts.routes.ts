@@ -4,7 +4,7 @@ import { uploadFiles } from '../../middlewares/upload.middleware';
 import { validate } from '../../middlewares/validate.middleware';
 import { idParamsSchema } from '../../utils/object-id';
 import { expertsController } from './experts.controller';
-import { createExpertSchema, listExpertsQuerySchema, publicExpertsQuerySchema, updateExpertSchema } from './experts.schema';
+import { createExpertSchema, expertSelfUpdateSchema, listExpertsQuerySchema, publicExpertsQuerySchema, updateExpertSchema } from './experts.schema';
 
 const router = Router();
 
@@ -14,8 +14,12 @@ router.get('/public/featured', expertsController.getFeatured);
 router.get('/public/counts', expertsController.countByCategory);
 router.get('/public/:slug', expertsController.getBySlug);
 
-// Admin endpoints
+// Expert self-profile endpoints
 router.use(authenticate);
+router.get('/me', authorize('expert'), expertsController.getMe);
+router.patch('/me', authorize('expert'), validate({ body: expertSelfUpdateSchema }), expertsController.updateMe);
+
+// Admin endpoints
 router.get('/', authorize('admin', 'manager', 'super_admin'), validate({ query: listExpertsQuerySchema }), expertsController.list);
 router.post('/', authorize('admin', 'super_admin'), validate({ body: createExpertSchema }), expertsController.create);
 // multipart/form-data, single image in field "photo"; returns { url } to store on the expert.
